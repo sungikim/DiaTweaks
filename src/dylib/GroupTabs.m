@@ -370,15 +370,15 @@ void DPInstallGroupTabs(void) {
     DPDelegateByBrowser = [NSMapTable weakToWeakObjectsMapTable];
     DPWindowByBrowser = [NSMapTable weakToWeakObjectsMapTable];
 
-    DPHook(NSClassFromString(@"ArcBrowser"), @selector(setDelegate:), (IMP)DPBrowser_setDelegate);
-    DPHook(NSClassFromString(@"ArcBrowser"), @selector(setWindow:), (IMP)DPBrowser_setWindow);
-    DPHook(NSClassFromString(@"ArcBrowser"), @selector(createWebContents:), (IMP)DPBrowser_createWebContents);
-    DPHook(NSClassFromString(@"ArcBrowser"), @selector(takeOwnershipOfWebContents:), (IMP)DPBrowser_takeOwnership);
+    DPHook(NSClassFromString(@"ArcBrowser"), @selector(setDelegate:), DPBrowser_setDelegate);
+    DPHook(NSClassFromString(@"ArcBrowser"), @selector(setWindow:), DPBrowser_setWindow);
+    DPHook(NSClassFromString(@"ArcBrowser"), @selector(createWebContents:), DPBrowser_createWebContents);
+    DPHook(NSClassFromString(@"ArcBrowser"), @selector(takeOwnershipOfWebContents:), DPBrowser_takeOwnership);
     Class browserDelegate = NSClassFromString(@"_TtC3ADK15ChromiumBrowser");
-    DPHook(browserDelegate, @selector(browser:didRestoreWebContents:withSessionId:), (IMP)DPBrowser_didRestore);
-    DPHook(browserDelegate, @selector(browser:didCreateNewWebContents:isActive:), (IMP)DPBrowser_didCreate);
-    DPHook(NSMenu.class, @selector(addItem:), (IMP)DPMenu_addItem);
-    DPHook(NSMenu.class, @selector(insertItem:atIndex:), (IMP)DPMenu_insertItem);
+    DPHook(browserDelegate, @selector(browser:didRestoreWebContents:withSessionId:), DPBrowser_didRestore);
+    DPHook(browserDelegate, @selector(browser:didCreateNewWebContents:isActive:), DPBrowser_didCreate);
+    DPHook(NSMenu.class, @selector(addItem:), DPMenu_addItem);
+    DPHook(NSMenu.class, @selector(insertItem:atIndex:), DPMenu_insertItem);
 
     [NSNotificationCenter.defaultCenter addObserverForName:NSApplicationDidFinishLaunchingNotification object:nil queue:nil
                                                 usingBlock:^(NSNotification *_) { DPInstallMenuBarItem(); }];

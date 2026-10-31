@@ -23,10 +23,14 @@ extern const NSUInteger DPPatchCount;
 
 void DPSetPatch(DPPatch *patch, BOOL on);
 
-void DPHook(Class cls, SEL sel, IMP replacement);
-IMP DPOriginalIMP(id object, SEL sel);
+// Hooks on the same method chain: each replacement's DPCallOriginal calls what was there when it was installed. It finds
+// that by the replacement's name (__func__), so pass DPHook the function itself and call DPCallOriginal directly in it,
+// not from a block or helper.
+#define DPHook(cls, sel, function) DPHookFunction(cls, sel, (IMP)function, #function)
+void DPHookFunction(Class cls, SEL sel, IMP replacement, const char *name);
+IMP DPOriginalIMP(id object, SEL sel, const char *name);
 
-#define DPCallOriginal(type, object, sel, ...) ((type)DPOriginalIMP(object, sel))(object, sel, ##__VA_ARGS__)
+#define DPCallOriginal(type, object, sel, ...) ((type)DPOriginalIMP(object, sel, __func__))(object, sel, ##__VA_ARGS__)
 
 NSView *DPFindView(NSView *root, BOOL (^match)(NSView *));
 

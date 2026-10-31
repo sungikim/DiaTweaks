@@ -33,10 +33,10 @@ static void DPButton_setHidden(NSView *self, SEL _cmd, BOOL hidden) {
 static void DPEnforceButton(NSView *view) {
     DPPatch *patch = DPButtonPatch(view);
     if (!patch) return;
-    DPHook(view.class, @selector(setHidden:), (IMP)DPButton_setHidden);
+    DPHook(view.class, @selector(setHidden:), DPButton_setHidden);
     if (!patch->on || view.hidden) return;
-    [DPSuppressed addObject:view];
-    DPCallOriginal(void (*)(id, SEL, BOOL), view, @selector(setHidden:), YES);
+    // As if Dia showed it again: the hook hides it and remembers to restore it.
+    DPButton_setHidden(view, @selector(setHidden:), NO);
 }
 
 static void DPButton_viewDidMoveToWindow(NSView *self, SEL _cmd) {
@@ -46,7 +46,7 @@ static void DPButton_viewDidMoveToWindow(NSView *self, SEL _cmd) {
 
 static BOOL DPEnforceButtons(NSView *view) {
     if (DPButtonPatch(view)) {
-        DPHook(view.class, @selector(viewDidMoveToWindow), (IMP)DPButton_viewDidMoveToWindow);
+        DPHook(view.class, @selector(viewDidMoveToWindow), DPButton_viewDidMoveToWindow);
         BOOL wasHidden = view.hidden;
         DPEnforceButton(view);
         return view.hidden != wasHidden;
@@ -119,7 +119,7 @@ void DPInstallButtons(void) {
     DPBars = [NSHashTable weakObjectsHashTable];
     DPSuppressed = [NSHashTable weakObjectsHashTable];
     for (NSString *bar in @[@"_TtC13NavigationBar17NavigationBarView", @"_TtC10TabSidebar17SidebarHeaderView", @"_TtC10TabSidebar26SidebarContainerFooterView"])
-        DPHook(NSClassFromString(bar), @selector(layout), (IMP)DPBar_layout);
-    DPHook(NSClassFromString(@"_TtC10TabSidebar30SidebarContainerViewController"), @selector(viewDidLayout), (IMP)DPSidebar_viewDidLayout);
-    DPHook(NSClassFromString(@"_TtC8TabStrip31TabStripContainerViewController"), @selector(viewWillLayout), (IMP)DPTabStrip_viewWillLayout);
+        DPHook(NSClassFromString(bar), @selector(layout), DPBar_layout);
+    DPHook(NSClassFromString(@"_TtC10TabSidebar30SidebarContainerViewController"), @selector(viewDidLayout), DPSidebar_viewDidLayout);
+    DPHook(NSClassFromString(@"_TtC8TabStrip31TabStripContainerViewController"), @selector(viewWillLayout), DPTabStrip_viewWillLayout);
 }

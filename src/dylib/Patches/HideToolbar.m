@@ -228,8 +228,8 @@ static void DPRelayoutPanes(void) {
 
 static void DPInstallHideToolbar(void) {
     DPPanes = [NSHashTable weakObjectsHashTable];
-    DPHook(NSClassFromString(@"_TtC11ContentPane15ContentPaneView"), @selector(layout), (IMP)DPPane_layout);
-    DPHook(DPToolbarClass(), @selector(hitTest:), (IMP)DPToolbar_hitTest);
+    DPHook(NSClassFromString(@"_TtC11ContentPane15ContentPaneView"), @selector(layout), DPPane_layout);
+    DPHook(DPToolbarClass(), @selector(hitTest:), DPToolbar_hitTest);
 }
 
 static NSColor *DPGray(void) { return NSColor.systemGrayColor; }

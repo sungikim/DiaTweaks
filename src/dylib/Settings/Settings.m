@@ -96,8 +96,8 @@ static NSToolbarItem *DPSettings_toolbarItem(id self, SEL _cmd, NSToolbar *toolb
 
 void DPInstallSettings(void) {
     Class list = NSClassFromString(DPSidebarListClass);
-    DPHook(list, @selector(numberOfRowsInTableView:), (IMP)DPSidebar_numberOfRows);
-    DPHook(list, @selector(tableView:viewForTableColumn:row:), (IMP)DPSidebar_viewForRow);
-    DPHook(list, @selector(tableViewSelectionDidChange:), (IMP)DPSidebar_selectionDidChange);
-    DPHook(NSClassFromString(DPSettingsControllerClass), @selector(toolbar:itemForItemIdentifier:willBeInsertedIntoToolbar:), (IMP)DPSettings_toolbarItem);
+    DPHook(list, @selector(numberOfRowsInTableView:), DPSidebar_numberOfRows);
+    DPHook(list, @selector(tableView:viewForTableColumn:row:), DPSidebar_viewForRow);
+    DPHook(list, @selector(tableViewSelectionDidChange:), DPSidebar_selectionDidChange);
+    DPHook(NSClassFromString(DPSettingsControllerClass), @selector(toolbar:itemForItemIdentifier:willBeInsertedIntoToolbar:), DPSettings_toolbarItem);
 }

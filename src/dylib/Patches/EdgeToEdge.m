@@ -211,10 +211,10 @@ static void DPRelayoutContainers(void) {
 
 static void DPInstallEdgeToEdge(void) {
     DPContainers = [NSHashTable weakObjectsHashTable];
-    DPHook(DPContainerClass(), @selector(setFrame:), (IMP)DPContainer_setFrame);
+    DPHook(DPContainerClass(), @selector(setFrame:), DPContainer_setFrame);
     for (NSString *selector in @[@"layout", @"updateLayer"])
-        DPHook(DPContainerClass(), NSSelectorFromString(selector), (IMP)DPContainer_layoutOrUpdateLayer);
-    DPHook(NSClassFromString(@"_TtC5ARCUI10ShadowView"), @selector(layout), (IMP)DPShadow_layout);
+        DPHook(DPContainerClass(), NSSelectorFromString(selector), DPContainer_layoutOrUpdateLayer);
+    DPHook(NSClassFromString(@"_TtC5ARCUI10ShadowView"), @selector(layout), DPShadow_layout);
 }
 
 static NSColor *DPBlue(void) { return NSColor.systemBlueColor; }
