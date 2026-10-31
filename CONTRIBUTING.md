@@ -9,13 +9,17 @@ Keep it small, test it hard, show it working.
 - Never leave a section empty or delete it. If one doesn't apply, write `N/A` in it, and tick a checklist item that doesn't apply with `(N/A)` after it. Proof is never N/A for a change you can see in Dia.
 - Proof is required for anything visible in Dia: a screenshot for static changes, a screen recording for anything that animates. Show before and after when you change existing behaviour.
 - Try to break what you made before you open the PR, and fix what you find. Every change has to work with tabs in the sidebar and tabs at the top, and with each tweak on and off.
-- Build with `make` and run it on your own Dia with `./install.sh`.
+- Build with `make` and run it on your own Dia with `./install.sh`. Then run `make test`.
 
 ## Adding a patch
 
 - Put its `DPPatch` in a new `src/dylib/Patches/*.m`, declare it in `DiaPatches.h` and add it to `DPPatches[]` in `DiaPatches.m`.
 - List the Dia classes it relies on in `.classes`. On a Dia version without one of them, the patch stays off and Settings shows it as unavailable.
 - Give it a `.verify` that looks at Dia's views and returns `nil` when they match `on`, or a few words saying what's wrong. Find the views with `DPFindViews`, not through your own hooks, so a hook that never ran shows up as a failure.
+
+## Testing
+
+`make test` installs your build's dylib and reopens Dia in test mode. Dia tries the patches all off, all on, each on its own and in pairwise combinations without saving any of it, runs every patch's `verify` after each, then goes back to your settings. The script prints what failed and exits non-zero if anything did. It can't move the tabs between the sidebar and the top, so run it once in each layout. Square corners only get tested with the sidebar open.
 
 ## Commits
 

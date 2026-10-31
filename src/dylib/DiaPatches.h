@@ -25,7 +25,10 @@ extern DPPatch DPEdgeToEdge, DPSquareSidebarCorners, DPHideToolbar, DPRevealTool
 extern DPPatch *const DPPatches[];
 extern const NSUInteger DPPatchCount;
 
-void DPSetPatch(DPPatch *patch, BOOL on);
+// save: NO changes it only until Dia quits (test mode).
+void DPSetPatch(DPPatch *patch, BOOL on, BOOL save);
+BOOL DPSavedOn(DPPatch *patch);
+void DPRunTests(NSString *reportPath);
 
 // Hooks on the same method chain: each replacement's DPCallOriginal calls what was there when it was installed. It finds
 // that by the replacement's name (__func__), so pass DPHook the function itself and call DPCallOriginal directly in it,

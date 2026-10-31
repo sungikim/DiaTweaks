@@ -59,12 +59,17 @@ static void DPAnimate(void) {
     [NSRunLoop.mainRunLoop addTimer:timer forMode:NSRunLoopCommonModes];
 }
 
-void DPSetPatch(DPPatch *patch, BOOL on) {
+void DPSetPatch(DPPatch *patch, BOOL on, BOOL save) {
     if (patch->on == on) return;
     patch->on = on;
-    [DPDefaults setBool:on forKey:patch->key];
+    if (save) [DPDefaults setBool:on forKey:patch->key];
     if (patch->apply) patch->apply(patch);
     else DPAnimate();
+}
+
+BOOL DPSavedOn(DPPatch *patch) {
+    id value = [DPDefaults objectForKey:patch->key];
+    return !patch->unavailable && (value ? [value boolValue] : patch->defaultOn);
 }
 
 __attribute__((constructor)) static void DPInit(void) {
@@ -76,8 +81,7 @@ __attribute__((constructor)) static void DPInit(void) {
     for (NSUInteger i = 0; i < DPPatchCount; i++) {
         DPPatch *patch = DPPatches[i];
         for (DPPatch *required = patch->requires; required; required = required->requires) patch->unavailable |= required->unavailable;
-        id value = [DPDefaults objectForKey:patch->key];
-        patch->on = !patch->unavailable && (value ? [value boolValue] : patch->defaultOn);
+        patch->on = DPSavedOn(patch);
         patch->progress = patch->on;
     }
 
@@ -89,4 +93,8 @@ __attribute__((constructor)) static void DPInit(void) {
     DPInstallSettings();
 
     DPInstallUpdates();
+
+    NSString *report = NSProcessInfo.processInfo.environment[@"DIAPATCH_TEST"];
+    unsetenv("DIAPATCH_TEST");  // Dia relaunched from Settings would inherit it and test again.
+    if (report) DPRunTests(report);
 }

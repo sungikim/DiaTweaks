@@ -244,7 +244,7 @@ NSToolbarItemIdentifier const DPSearchItemIdentifier = @"DiaPatchesSearch";
 }
 
 - (void)toggle:(NSSwitch *)sender {
-    DPSetPatch(DPPatches[sender.tag], sender.state == NSControlStateValueOn);
+    DPSetPatch(DPPatches[sender.tag], sender.state == NSControlStateValueOn, YES);
     [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
         context.allowsImplicitAnimation = YES;
         [self updateRows];
