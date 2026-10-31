@@ -8,5 +8,7 @@ DPPatch DPHideRecentTabsButton = {
     .detail = @"Hide the recent tabs button in the tab bar or sidebar.",
     .symbol = @"clock.arrow.circlepath",
     .tint = DPPink,
+    .classes = DPClasses("_TtC10TabSidebar26SidebarContainerFooterView", "_TtC8TabStrip31TabStripContainerViewController"),
     .apply = DPApplyButtons,
+    .verify = DPVerifyButtons,
 };

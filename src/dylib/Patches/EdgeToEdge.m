@@ -4,9 +4,13 @@ static const CGFloat DPWindowPadding = 6;
 static NSHashTable<NSView *> *DPContainers;
 static char DPRequestedFrameKey, DPBaseRadiusKey, DPAssignedRadiusKey, DPChatKey, DPOriginalPathKey, DPAssignedPathKey;
 
+static NSView *DPRoundedContent(NSView *container) {
+    return DPFindView(container, ^BOOL(NSView *v) { return v != container && v.layer.masksToBounds && v.layer.cornerRadius > 0; });
+}
+
 // With Chat open Dia animates sidebar changes from its own geometry, so edge-to-edge steps aside.
 static NSView *DPChatCard(NSView *container) {
-    NSView *content = DPFindView(container, ^BOOL(NSView *v) { return v != container && v.layer.masksToBounds && v.layer.cornerRadius > 0; });
+    NSView *content = DPRoundedContent(container);
     NSSize size = content.bounds.size;
     BOOL (^isCard)(NSView *) = ^BOOL(NSView *v) {
         return v.layer.masksToBounds && v.layer.cornerRadius > 0 && NSWidth(v.bounds) > size.width / 4 && NSHeight(v.bounds) > size.height / 2;
@@ -20,22 +24,26 @@ static NSView *DPChatCard(NSView *container) {
     return nil;
 }
 
+// How far each edge of `frame` is from the same edge of the superview.
+static NSEdgeInsets DPGaps(NSView *superview, NSRect frame) {
+    NSRect bounds = superview.bounds;
+    CGFloat low = NSMinY(frame) - NSMinY(bounds), high = NSMaxY(bounds) - NSMaxY(frame);
+    return NSEdgeInsetsMake(superview.isFlipped ? low : high, NSMinX(frame) - NSMinX(bounds), superview.isFlipped ? high : low, NSMaxX(bounds) - NSMaxX(frame));
+}
+
 static NSRect DPEdgeToEdgeFrame(NSView *view, NSRect frame) {
     CGFloat inset = DPEdgeToEdge.progress * DPWindowPadding;
     NSView *superview = view.superview;
     if (inset == 0 || !superview || DPChatCard(view)) return frame;
-    NSRect bounds = superview.bounds;
-    CGFloat left = NSMinX(frame) - NSMinX(bounds), right = NSMaxX(bounds) - NSMaxX(frame);
-    CGFloat top = superview.isFlipped ? NSMinY(frame) - NSMinY(bounds) : NSMaxY(bounds) - NSMaxY(frame);
-    CGFloat bottom = superview.isFlipped ? NSMaxY(bounds) - NSMaxY(frame) : NSMinY(frame) - NSMinY(bounds);
+    NSEdgeInsets gaps = DPGaps(superview, frame);
     BOOL (^isPadding)(CGFloat) = ^BOOL(CGFloat gap) { return fabs(gap - DPWindowPadding) < 0.5; };
-    if (isPadding(left)) frame.origin.x -= inset, frame.size.width += inset;
-    if (isPadding(right)) frame.size.width += inset;
-    if (isPadding(top)) {
+    if (isPadding(gaps.left)) frame.origin.x -= inset, frame.size.width += inset;
+    if (isPadding(gaps.right)) frame.size.width += inset;
+    if (isPadding(gaps.top)) {
         frame.size.height += inset;
         if (superview.isFlipped) frame.origin.y -= inset;
     }
-    if (isPadding(bottom)) {
+    if (isPadding(gaps.bottom)) {
         frame.size.height += inset;
         if (!superview.isFlipped) frame.origin.y -= inset;
     }
@@ -110,13 +118,15 @@ static CGPathRef DPReshapeCorners(CGPathRef path, CGFloat extent, CGFloat rightS
     return (CGPathRef)CFAutorelease(reshaped);
 }
 
+static BOOL DPBesideSidebar(NSView *container) {
+    return NSMinX(container.frame) > DPWindowPadding + 1 && !DPChatCard(container);
+}
+
 static void DPApplySquareCorners(NSView *container) {
-    NSView *content = DPFindView(container, ^BOOL(NSView *v) { return v != container && v.layer.masksToBounds && v.layer.cornerRadius > 0; });
-    CALayer *layer = content.layer;
+    CALayer *layer = DPRoundedContent(container).layer;
     if (!layer) return;
     layer.cornerCurve = kCACornerCurveContinuous;
-    CGFloat square = NSMinX(container.frame) > DPWindowPadding + 1 && !DPChatCard(container)
-        ? DPSquareSidebarCorners.progress * DPEdgeToEdge.progress : 0;
+    CGFloat square = DPBesideSidebar(container) ? DPSquareSidebarCorners.progress * DPEdgeToEdge.progress : 0;
     CACornerMask left = kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner, right = kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
@@ -209,6 +219,34 @@ static void DPRelayoutContainers(void) {
     }
 }
 
+static NSString *DPVerifyEdgeToEdge(DPPatch *patch) {
+    NSArray<NSView *> *containers = DPFindViews(DPContainerClass());
+    if (!containers.count) return @"no web content found";
+    for (NSView *container in containers) {
+        NSValue *requested = objc_getAssociatedObject(container, &DPRequestedFrameKey);
+        if (!requested) return @"never saw Dia place the web content";
+        if (!patch->on || DPChatCard(container)) {
+            if (!NSEqualRects(container.frame, requested.rectValue)) return @"web content isn't where Dia put it";
+            continue;
+        }
+        NSEdgeInsets gaps = DPGaps(container.superview, container.frame);
+        if (fabs(gaps.right) > 0.5 || fabs(gaps.bottom) > 0.5) return @"web content doesn't reach the window's edge";
+        if (fabs(gaps.top - DPWindowPadding) < 0.5 || fabs(gaps.left - DPWindowPadding) < 0.5) return @"padding left around web content";
+    }
+    return nil;
+}
+
+static NSString *DPVerifySquareCorners(DPPatch *patch) {
+    CACornerMask right = kCALayerMaxXMinYCorner | kCALayerMaxXMaxYCorner, all = right | kCALayerMinXMinYCorner | kCALayerMinXMaxYCorner;
+    for (NSView *container in DPFindViews(DPContainerClass())) {
+        CALayer *layer = DPRoundedContent(container).layer;
+        if (!layer) return @"no rounded web content found";
+        BOOL square = patch->on && DPEdgeToEdge.on && DPBesideSidebar(container);
+        if (layer.mask || layer.maskedCorners != (square ? right : all)) return square ? @"corners by the sidebar are round" : @"corners by the sidebar are square";
+    }
+    return nil;
+}
+
 static void DPInstallEdgeToEdge(void) {
     DPContainers = [NSHashTable weakObjectsHashTable];
     DPHook(DPContainerClass(), @selector(setFrame:), DPContainer_setFrame);
@@ -226,8 +264,10 @@ DPPatch DPEdgeToEdge = {
     .detail = @"Remove the padding between web pages and the window edge.",
     .symbol = @"squareshape.squareshape.dotted",
     .tint = DPBlue,
+    .classes = DPClasses("_TtC6Window20ContentContainerView", "_TtC5ARCUI10ShadowView"),
     .install = DPInstallEdgeToEdge,
     .relayout = DPRelayoutContainers,
+    .verify = DPVerifyEdgeToEdge,
 };
 
 static NSColor *DPIndigo(void) { return NSColor.systemIndigoColor; }
@@ -240,4 +280,5 @@ DPPatch DPSquareSidebarCorners = {
     .symbol = @"square",
     .tint = DPIndigo,
     .requires = &DPEdgeToEdge,
+    .verify = DPVerifySquareCorners,
 };

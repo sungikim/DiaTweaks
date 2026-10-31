@@ -115,11 +115,40 @@ void DPApplyButtons(DPPatch *patch) {
     DPRelayoutBars();
 }
 
+static NSArray<NSString *> *DPBarClasses(void) {
+    return @[@"_TtC13NavigationBar17NavigationBarView", @"_TtC10TabSidebar17SidebarHeaderView", @"_TtC10TabSidebar26SidebarContainerFooterView"];
+}
+
+static NSString *DPButtonProblem(NSView *view, DPPatch *patch) {
+    DPPatch *owner = DPButtonPatch(view);
+    if (owner) {
+        if (owner != patch) return nil;
+        if (patch->on && !view.hiddenOrHasHiddenAncestor) return @"button still shows";
+        return !patch->on && [DPSuppressed containsObject:view] ? @"button still hidden" : nil;
+    }
+    for (NSView *sub in view.subviews) {
+        NSString *problem = DPButtonProblem(sub, patch);
+        if (problem) return problem;
+    }
+    return nil;
+}
+
+// A button that isn't there passes: not every layout has every button.
+NSString *DPVerifyButtons(DPPatch *patch) {
+    NSHashTable<NSView *> *bars = [DPBars copy];
+    for (NSString *name in DPBarClasses()) for (NSView *bar in DPFindViews(NSClassFromString(name))) [bars addObject:bar];
+    if (!bars.count) return @"no toolbar or tab bar found";
+    for (NSView *bar in bars) {
+        NSString *problem = bar.window.isVisible ? DPButtonProblem(bar, patch) : nil;
+        if (problem) return problem;
+    }
+    return nil;
+}
+
 void DPInstallButtons(void) {
     DPBars = [NSHashTable weakObjectsHashTable];
     DPSuppressed = [NSHashTable weakObjectsHashTable];
-    for (NSString *bar in @[@"_TtC13NavigationBar17NavigationBarView", @"_TtC10TabSidebar17SidebarHeaderView", @"_TtC10TabSidebar26SidebarContainerFooterView"])
-        DPHook(NSClassFromString(bar), @selector(layout), DPBar_layout);
+    for (NSString *bar in DPBarClasses()) DPHook(NSClassFromString(bar), @selector(layout), DPBar_layout);
     DPHook(NSClassFromString(@"_TtC10TabSidebar30SidebarContainerViewController"), @selector(viewDidLayout), DPSidebar_viewDidLayout);
     DPHook(NSClassFromString(@"_TtC8TabStrip31TabStripContainerViewController"), @selector(viewWillLayout), DPTabStrip_viewWillLayout);
 }

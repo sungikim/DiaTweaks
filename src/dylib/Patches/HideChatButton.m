@@ -8,6 +8,8 @@ DPPatch DPHideChatButton = {
     .detail = @"Hide the Chat button at the top right of the toolbar.",
     .symbol = @"bubble.fill",
     .tint = DPPurple,
+    .classes = DPClasses("_TtC13NavigationBar17NavigationBarView"),
     .disabledBy = &DPHideToolbar,
     .apply = DPApplyButtons,
+    .verify = DPVerifyButtons,
 };

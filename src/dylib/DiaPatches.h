@@ -8,14 +8,18 @@ struct DPPatch {
     BOOL defaultOn;
     __unsafe_unretained NSString *title, *detail, *symbol;
     NSColor *(*tint)(void);
+    const char *const *classes;  // Dia classes it needs. If one is missing, the patch stays off and Settings says it's unavailable.
     DPPatch *requires;    // Settings shows the row only while this patch is on.
     DPPatch *disabledBy;  // Settings disables the switch while this patch is on.
     void (*install)(void);
     void (*apply)(DPPatch *patch);  // Applies a toggle at once. Without it, `progress` eases toward `on` while every patch's `relayout` runs each frame.
     void (*relayout)(void);
-    BOOL on;
+    NSString *(*verify)(DPPatch *patch);  // nil if Dia's views match `on`, otherwise what's wrong.
+    BOOL on, unavailable;
     CGFloat progress;
 };
+
+#define DPClasses(...) ((const char *const []){__VA_ARGS__, NULL})
 
 extern DPPatch DPEdgeToEdge, DPSquareSidebarCorners, DPHideToolbar, DPRevealToolbarOnHover, DPHideSidebarButton, DPHideChatButton, DPHideChatsButton, DPHideRecentTabsButton;
 extern DPPatch *const DPPatches[];
@@ -33,9 +37,11 @@ IMP DPOriginalIMP(id object, SEL sel, const char *name);
 #define DPCallOriginal(type, object, sel, ...) ((type)DPOriginalIMP(object, sel, __func__))(object, sel, ##__VA_ARGS__)
 
 NSView *DPFindView(NSView *root, BOOL (^match)(NSView *));
+NSArray<NSView *> *DPFindViews(Class cls);  // In every visible window.
 
 void DPInstallButtons(void);
 void DPApplyButtons(DPPatch *patch);
+NSString *DPVerifyButtons(DPPatch *patch);
 
 void DPInstallSettings(void);
 

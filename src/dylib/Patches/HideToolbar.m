@@ -22,6 +22,11 @@ static Class DPToolbarClass(void) {
     return cls = cls ?: NSClassFromString(@"_TtC13NavigationBar17NavigationBarView");
 }
 
+static Class DPPaneClass(void) {
+    static Class cls;
+    return cls = cls ?: NSClassFromString(@"_TtC11ContentPane15ContentPaneView");
+}
+
 static void DPApplyToolbar(NSView *pane);
 
 @interface DPToolbarHover : NSObject
@@ -158,9 +163,17 @@ static NSView *DPToolbar_hitTest(NSView *self, SEL _cmd, NSPoint point) {
     return DPHideToolbar.on && hover.progress == 0 ? nil : DPCallOriginal(NSView *(*)(id, SEL, NSPoint), self, _cmd, point);
 }
 
+static NSView *DPToolbarIn(NSView *pane) {
+    for (NSView *sub in pane.subviews) if ([sub isKindOfClass:DPToolbarClass()]) return sub;
+    return nil;
+}
+
+// Distances from the pane's top, whichever way it's flipped.
+static CGFloat DPTop(NSView *pane, NSRect r) { return pane.isFlipped ? NSMinY(r) : NSHeight(pane.bounds) - NSMaxY(r); }
+static CGFloat DPBottom(NSView *pane, NSRect r) { return pane.isFlipped ? NSMaxY(r) : NSHeight(pane.bounds) - NSMinY(r); }
+
 static void DPApplyToolbar(NSView *pane) {
-    NSView *bar = nil;
-    for (NSView *sub in pane.subviews) if ([sub isKindOfClass:DPToolbarClass()]) { bar = sub; break; }
+    NSView *bar = DPToolbarIn(pane);
     if (!bar) return;
 
     DPToolbarHover *hover = objc_getAssociatedObject(pane, &DPToolbarHoverKey);
@@ -183,23 +196,20 @@ static void DPApplyToolbar(NSView *pane) {
         [pane addSubview:bar positioned:NSWindowAbove relativeTo:nil];
     }
 
-    BOOL flipped = pane.isFlipped;
-    CGFloat (^top)(NSRect) = ^CGFloat(NSRect r) { return flipped ? NSMinY(r) : NSHeight(pane.bounds) - NSMaxY(r); };
-    CGFloat (^bottom)(NSRect) = ^CGFloat(NSRect r) { return flipped ? NSMaxY(r) : NSHeight(pane.bounds) - NSMinY(r); };
-    CGFloat shift = NSHeight(bar.frame) * progress, edge = bottom(bar.frame);
+    CGFloat shift = NSHeight(bar.frame) * progress, edge = DPBottom(pane, bar.frame);
     NSMutableArray<NSView *> *stack = [NSMutableArray new];
     for (NSView *sub in pane.subviews) if (sub != bar) [stack addObject:sub];
     [stack sortUsingComparator:^NSComparisonResult(NSView *a, NSView *b) {
-        return [@(top(DPLaidOutFrame(a))) compare:@(top(DPLaidOutFrame(b)))];
+        return [@(DPTop(pane, DPLaidOutFrame(a))) compare:@(DPTop(pane, DPLaidOutFrame(b)))];
     }];
     for (NSView *view in stack) {
         NSRect laidOut = DPLaidOutFrame(view);
-        if (fabs(top(laidOut) - edge) > 0.5) continue;
-        BOOL reachesBottom = fabs(bottom(laidOut) - NSHeight(pane.bounds)) < 0.5;
-        if (!reachesBottom) edge = bottom(laidOut);
+        if (fabs(DPTop(pane, laidOut) - edge) > 0.5) continue;
+        BOOL reachesBottom = fabs(DPBottom(pane, laidOut) - NSHeight(pane.bounds)) < 0.5;
+        if (!reachesBottom) edge = DPBottom(pane, laidOut);
         NSRect frame = laidOut;
         if (reachesBottom) frame.size.height += shift;
-        if (flipped) frame.origin.y -= shift;
+        if (pane.isFlipped) frame.origin.y -= shift;
         else if (!reachesBottom) frame.origin.y += shift;
         DPAssignFrame(view, laidOut, frame);
         // Dia sizes the web view once instead of autoresizing it.
@@ -228,8 +238,43 @@ static void DPRelayoutPanes(void) {
 
 static void DPInstallHideToolbar(void) {
     DPPanes = [NSHashTable weakObjectsHashTable];
-    DPHook(NSClassFromString(@"_TtC11ContentPane15ContentPaneView"), @selector(layout), DPPane_layout);
+    DPHook(DPPaneClass(), @selector(layout), DPPane_layout);
     DPHook(DPToolbarClass(), @selector(hitTest:), DPToolbar_hitTest);
+}
+
+static NSString *DPVerifyHideToolbar(DPPatch *patch) {
+    NSArray<NSView *> *panes = DPFindViews(DPPaneClass());
+    if (!panes.count) return @"no toolbar found";
+    for (NSView *pane in panes) {
+        NSView *bar = DPToolbarIn(pane);
+        if (!bar) return @"no toolbar found";
+        DPToolbarHover *hover = objc_getAssociatedObject(pane, &DPToolbarHoverKey);
+        if (hover.progress > 0) continue;  // Revealed by the pointer.
+        BOOL hidden = patch->on, found = NO;
+        if (fabs(bar.alphaValue - (hidden ? 0 : 1)) > 0.01) return hidden ? @"toolbar still shows" : @"toolbar is invisible";
+        if (hidden && [bar hitTest:NSMakePoint(NSMidX(bar.frame), NSMidY(bar.frame))]) return @"toolbar still takes clicks";
+        for (NSView *view in pane.subviews) {
+            NSRect laidOut = DPLaidOutFrame(view);
+            if (view == bar || view.hidden || fabs(DPTop(pane, laidOut) - DPBottom(pane, bar.frame)) > 0.5) continue;
+            found = YES;
+            CGFloat shift = hidden ? NSHeight(bar.frame) : 0;
+            if (fabs(DPTop(pane, view.frame) - (DPTop(pane, laidOut) - shift)) > 0.5)
+                return hidden ? @"page didn't move up into the toolbar's place" : @"page isn't below the toolbar";
+        }
+        if (!found) return @"no page found below the toolbar";
+    }
+    return nil;
+}
+
+static NSString *DPVerifyRevealToolbar(DPPatch *patch) {
+    for (NSView *pane in DPFindViews(DPPaneClass())) {
+        DPToolbarHover *hover = objc_getAssociatedObject(pane, &DPToolbarHoverKey);
+        NSView *bar = DPToolbarIn(pane);
+        BOOL watching = patch->on && DPHideToolbar.on && bar && !bar.hiddenOrHasHiddenAncestor;
+        if ((hover.tracking != nil) != watching) return watching ? @"nothing watches the top of the page" : @"still watching the top of the page";
+        if (watching && !hover.revealed && bar.alphaValue > 0.01) return @"toolbar shows while the pointer is away";
+    }
+    return nil;
 }
 
 static NSColor *DPGray(void) { return NSColor.systemGrayColor; }
@@ -240,8 +285,10 @@ DPPatch DPHideToolbar = {
     .detail = @"Remove the bar with the address, navigation buttons and extensions. Experimental.",
     .symbol = @"menubar.rectangle",
     .tint = DPGray,
+    .classes = DPClasses("_TtC11ContentPane15ContentPaneView", "_TtC13NavigationBar17NavigationBarView"),
     .install = DPInstallHideToolbar,
     .relayout = DPRelayoutPanes,
+    .verify = DPVerifyHideToolbar,
 };
 
 static NSColor *DPTeal(void) { return NSColor.systemTealColor; }
@@ -255,4 +302,5 @@ DPPatch DPRevealToolbarOnHover = {
     .tint = DPTeal,
     .requires = &DPHideToolbar,
     .apply = DPApplyReveal,
+    .verify = DPVerifyRevealToolbar,
 };

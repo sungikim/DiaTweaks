@@ -99,7 +99,7 @@ NSToolbarItemIdentifier const DPSearchItemIdentifier = @"DiaPatchesSearch";
         DPPatch *patch = DPPatches[i];
         NSStackView *text = [NSStackView stackViewWithViews:@[
             DPLabel(patch->title, 13, NSFontWeightRegular, NSColor.labelColor),
-            DPLabel(patch->detail, 11, NSFontWeightRegular, NSColor.secondaryLabelColor),
+            DPLabel(patch->unavailable ? @"Unavailable on this Dia version." : patch->detail, 11, NSFontWeightRegular, NSColor.secondaryLabelColor),
         ]];
         text.orientation = NSUserInterfaceLayoutOrientationVertical;
         text.alignment = NSLayoutAttributeLeading;
@@ -215,17 +215,17 @@ NSToolbarItemIdentifier const DPSearchItemIdentifier = @"DiaPatchesSearch";
     NSString *query = self.searchItem.searchField.stringValue;
     NSArray<NSString *> *words = [query componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     BOOL searching = [query stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet].length > 0;
-    NSMutableSet<NSView *> *unavailable = [NSMutableSet set];
+    NSMutableSet<NSView *> *hiddenRows = [NSMutableSet set];
     for (NSSwitch *toggle in self.toggles) {
         DPPatch *patch = DPPatches[toggle.tag];
-        if (patch->disabledBy) toggle.enabled = !patch->disabledBy->on;
-        if (patch->requires && !patch->requires->on) [unavailable addObject:toggle.superview];
+        toggle.enabled = !patch->unavailable && !(patch->disabledBy && patch->disabledBy->on);
+        if (patch->requires && !patch->requires->on) [hiddenRows addObject:toggle.superview];
     }
     BOOL anything = NO;
     for (NSArray *section in self.sections) {
         BOOL any = NO;
         for (NSView *row in section[2]) {
-            BOOL visible = ![unavailable containsObject:row] && [self matches:row words:words];
+            BOOL visible = ![hiddenRows containsObject:row] && [self matches:row words:words];
             NSArray<NSView *> *arranged = ((NSStackView *)row.superview).arrangedSubviews;
             NSUInteger index = [arranged indexOfObject:row];
             row.hidden = !visible;

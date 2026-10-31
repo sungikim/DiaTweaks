@@ -11,6 +11,12 @@ Keep it small, test it hard, show it working.
 - Try to break what you made before you open the PR, and fix what you find. Every change has to work with tabs in the sidebar and tabs at the top, and with each tweak on and off.
 - Build with `make` and run it on your own Dia with `./install.sh`.
 
+## Adding a patch
+
+- Put its `DPPatch` in a new `src/dylib/Patches/*.m`, declare it in `DiaPatches.h` and add it to `DPPatches[]` in `DiaPatches.m`.
+- List the Dia classes it relies on in `.classes`. On a Dia version without one of them, the patch stays off and Settings shows it as unavailable.
+- Give it a `.verify` that looks at Dia's views and returns `nil` when they match `on`, or a few words saying what's wrong. Find the views with `DPFindViews`, not through your own hooks, so a hook that never ran shows up as a failure.
+
 ## Commits
 
 - [Conventional Commits](https://www.conventionalcommits.org): `fix(dylib): keep the top padding under horizontal tabs`.
