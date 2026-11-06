@@ -26,6 +26,9 @@ This fork of [JaceThings/DiaTweaks](https://github.com/JaceThings/DiaTweaks) add
 - **Phone access.** Turn it on under Phone in Settings → Patches and open the address it shows (or scan its QR code) on your phone, over your network or Tailscale: your spaces' favorites, bookmarks with their folders, and open tabs, searchable, with links that open on the phone. In Safari, Share → Add to Home Screen makes it an app. The page lives at a secret address only you are given.
 - **Downloads at the bottom.** Dia's downloads button moves from the top of the sidebar to its bottom left and stays there even when there are no downloads.
 - **Tab memory.** Each tab's row in the sidebar shows the memory it uses, in MB, the figure Activity Monitor shows for its processes. Tabs sharing a process each count all of it. Experimental: it keeps a DevTools setting on that Dia turns off.
+- **Move folders to any space.** A folder with subfolders can also go to the spaces Dia greys out for it. The folder is made again there, so its tabs reload and may be logged out.
+- **New Tab opens the command bar.** New Tab in the sidebar opens the bar ⌘T does instead of Dia's new tab page.
+- **Plain new tab page.** Dia's new tab page keeps only its address box, without AI suggestions, upsells or the template gallery.
 - **Little window for links.** Like Little Arc, a link opened from another app opens in a small window without the sidebar. **Open in Window** (⌘O) moves the page to a tab in your main window.
 - **Keep windows active.** A window keeps its active look after you click into another app.
 - **Full screen** squares the page's corners, and if Dia quits unexpectedly twice right after opening, the patches turn themselves off until you turn them back on in Settings → Patches.

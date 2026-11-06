@@ -1762,6 +1762,8 @@ static void hookedSendEvent(NSApplication *self, SEL _cmd, NSEvent *e) {
 
 #pragma mark - Public
 
+BOOL DPArcBarOpenNewTab(NSWindow *window) { return gCommandOn && showCommandBar(window, YES); }
+
 NSString *DPArcBarSiteKey(NSString *url) { return url.length ? siteKey([NSURL URLWithString:url]) : nil; }
 
 NSImage *DPArcBarFavicon(NSString *url) {

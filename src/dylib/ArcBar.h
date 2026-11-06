@@ -7,6 +7,8 @@ void DPArcBarInstall(void);
 // whether the URL bar ends with the ⋯ extensions button, and whether Dia's downloads button sits at the
 // sidebar's bottom right instead of its top.
 void DPArcBarConfigure(BOOL sidebarURLBar, BOOL commandBar, BOOL extensionsButton, BOOL downloadsAtBottom);
+// Opens the command bar for a new tab, as ⌘T does. NO if the command bar is off.
+BOOL DPArcBarOpenNewTab(NSWindow *window);
 // A page's favicon from the current profile's Favicons database, or nil.
 NSImage *DPArcBarFavicon(NSString *url);
 // The name a site's saved icon goes by in DiaPatches/site-icons ("github.com", "localhost_3000"), or nil.

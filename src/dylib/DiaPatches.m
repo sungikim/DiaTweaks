@@ -19,11 +19,11 @@
 typedef NS_ENUM(NSInteger, DPTweak) {
     DPEdgeToEdge, DPHideToolbar, DPSquareSidebarCorners, DPAnimatedCount,
     DPHideChatButton = DPAnimatedCount, DPHideSidebarButton, DPHideChatsButton, DPHideRecentTabsButton, DPNestedFolders,
-    DPExtensionsButton, DPHideTabGlow, DPSidebarURLBar, DPCommandBar, DPFolderDropdowns, DPKeepWindowsActive, DPTidyTabs, DPDownloadsAtBottom, DPLittleWindow, DPTabMemory, DPArcBookmarks, DPPhoneAccess, DPTweakCount
+    DPExtensionsButton, DPHideTabGlow, DPSidebarURLBar, DPCommandBar, DPFolderDropdowns, DPKeepWindowsActive, DPTidyTabs, DPDownloadsAtBottom, DPLittleWindow, DPTabMemory, DPMoveToSpace, DPNewTabBar, DPPlainNewTab, DPArcBookmarks, DPPhoneAccess, DPTweakCount
 };
 
-static NSString *const DPKeys[DPTweakCount] = {@"edgeToEdge", @"hideToolbar", @"squareSidebarCorners", @"hideChatButton", @"hideSidebarButton", @"hideChatsButton", @"hideRecentTabsButton", @"nestedFolders", @"extensionsButton", @"hideTabGlow", @"sidebarURLBar", @"commandBar", @"folderDropdowns", @"keepWindowsActive", @"tidyTabs", @"downloadsAtBottom", @"littleWindow", @"tabMemory", @"arcBookmarks", @"phoneAccess"};
-static const BOOL DPDefaultsOn[DPTweakCount] = {YES, NO, YES, NO, NO, NO, NO, NO, YES, YES, YES, YES, YES, NO, YES, YES, YES, YES, YES, NO};
+static NSString *const DPKeys[DPTweakCount] = {@"edgeToEdge", @"hideToolbar", @"squareSidebarCorners", @"hideChatButton", @"hideSidebarButton", @"hideChatsButton", @"hideRecentTabsButton", @"nestedFolders", @"extensionsButton", @"hideTabGlow", @"sidebarURLBar", @"commandBar", @"folderDropdowns", @"keepWindowsActive", @"tidyTabs", @"downloadsAtBottom", @"littleWindow", @"tabMemory", @"moveToSpace", @"newTabBar", @"plainNewTab", @"arcBookmarks", @"phoneAccess"};
+static const BOOL DPDefaultsOn[DPTweakCount] = {YES, NO, YES, NO, NO, NO, NO, NO, YES, YES, YES, YES, YES, NO, YES, YES, YES, YES, YES, YES, YES, YES, NO};
 static const CGFloat DPWindowPadding = 6;
 static const CFTimeInterval DPAnimationDuration = 0.25;
 
@@ -1455,6 +1455,17 @@ static void DPAddTidyItems(NSMenu *menu) {
     }
 }
 
+// New Tab in the sidebar: the command bar instead of Dia's new tab page.
+static void DPWatchNewTabClicks(void) {
+    [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown handler:^NSEvent *(NSEvent *e) {
+        if (!DPOn[DPNewTabBar] || !DPBrowserWindow(e.window)) return e;
+        NSView *root = e.window.contentView.superview;
+        for (NSView *v = [root hitTest:[root convertPoint:e.locationInWindow fromView:nil]]; v; v = v.superview)
+            if ((DPIsKind(v, @"TabList.NewTabCellView") || DPIsKind(v, @"TabList.NewTabStickyView")) && DPArcBarOpenNewTab(e.window)) return nil;
+        return e;
+    }];
+}
+
 // Right-clicking the sidebar's empty space: Dia's menu for it gets the two items; with none, a menu of just them.
 static void DPWatchSidebarBackgroundClicks(void) {
     [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskRightMouseDown handler:^NSEvent *(NSEvent *e) {
@@ -1734,7 +1745,7 @@ static NSArray<NSArray<DPArcFolder *> *> *DPArcSpaces(void) {
     return result;
 }
 
-// Dia titles a folder whose name repeats with its Arc path, "pxd › pxd old › old".
+// Dia titles a folder whose name repeats with its Arc path, "Work › Work old › old".
 static BOOL DPTitleMatches(DPArcFolder *folder, NSString *title) {
     if (!folder.title || !title) return NO;
     if ([title isEqualToString:folder.title]) return YES;
@@ -2320,7 +2331,7 @@ static void DPSetTweak(DPTweak tweak, BOOL on) {
     else if (tweak == DPTidyTabs) DPRefreshSeparators();
     else if (tweak == DPPhoneAccess) DPApplyPhoneAccess();
     else if (tweak == DPTabMemory) DPApplyTabMemory();
-    else if (tweak != DPNestedFolders && tweak != DPSidebarURLBar && tweak != DPCommandBar && tweak != DPFolderDropdowns && tweak != DPArcBookmarks && tweak != DPDownloadsAtBottom && tweak != DPLittleWindow && tweak != DPTabMemory) {
+    else if (tweak != DPNestedFolders && tweak != DPSidebarURLBar && tweak != DPCommandBar && tweak != DPFolderDropdowns && tweak != DPArcBookmarks && tweak != DPDownloadsAtBottom && tweak != DPLittleWindow && tweak != DPTabMemory && tweak != DPMoveToSpace && tweak != DPNewTabBar && tweak != DPPlainNewTab) {
         if (on) for (NSView *bar in DPBars.allObjects) DPEnforceButtons(bar);
         else DPRestoreButtons(tweak);
         DPRelayoutBars();
@@ -3163,6 +3174,24 @@ static void DPTakeOverSpaceMoves(NSMenu *menu, NSMenu *spaces) {
         item.action = @selector(moveToSpace:);
         item.representedObject = move;
         item.enabled = YES;
+    }
+}
+
+#pragma mark - Plain new tab page
+
+// Everything on Dia's new tab page besides its command bar. Dia shows these as it decides they apply, so they're
+// hidden after each layout.
+static void DPNewTabPage_viewDidLayout(NSViewController *self, SEL _cmd) {
+    DPCallOriginal(void (*)(id, SEL), self, _cmd);
+    if (!DPOn[DPPlainNewTab]) return;
+    static const char *const names[] = {"chatUsageCardHost", "tryForAWeekView", "defaultBrowserUpsellView", "skillsSuggestionsView", "connectAppsUpsellView",
+                                        "appsUpsellBarView", "newSingleAppUpsellBarView", "creationGalleryView", "welcomePostcardTeaserView",
+                                        "trialGuideStampCardView", "cliaOnboardingViewController"};
+    for (size_t i = 0; i < sizeof names / sizeof *names; i++) {
+        Ivar ivar = class_getInstanceVariable(object_getClass(self), names[i]);
+        id value = ivar ? object_getIvar(self, ivar) : nil;
+        NSView *view = [value isKindOfClass:NSViewController.class] ? [(NSViewController *)value view] : value;
+        if ([view isKindOfClass:NSView.class] && !view.hidden) view.hidden = YES;
     }
 }
 
@@ -4147,6 +4176,9 @@ static NSToolbarItemIdentifier const DPSearchItemIdentifier = @"DiaPatchesSearch
         {DPDownloadsAtBottom, @"arrow.down.circle", @"Downloads at the bottom", @"Put the downloads button at the bottom left of the sidebar instead of at the top, and keep it showing even with no downloads."},
         {DPLittleWindow, @"macwindow.on.rectangle", @"Little window for links", @"Links opened from other apps open in a small window without the sidebar, like Little Arc. Open in Window (⌘O) moves the page to a tab in your main window. Experimental."},
         {DPTabMemory, @"memorychip", @"Tab memory", @"Show how much memory each tab uses, in MB, on the right of its row in the sidebar. Tabs sharing a process each count all of it. Experimental."},
+        {DPMoveToSpace, @"folder", @"Move folders to any space", @"A folder's Move to Space can also pick the spaces Dia greys out for a folder with subfolders. The folder is made again there, so its tabs reload and may be logged out."},
+        {DPNewTabBar, @"plus.magnifyingglass", @"New Tab opens the command bar", @"New Tab in the sidebar opens the bar ⌘T does, with suggestions as you type, instead of Dia's new tab page. Needs Command bar."},
+        {DPPlainNewTab, @"rectangle", @"Plain new tab page", @"Dia's new tab page keeps only its address box: no AI suggestions, upsells or template gallery. New tab pages opened after turning it off are back to normal."},
         {DPArcBookmarks, @"bookmark", @"Arc-style bookmarks", @"Double-click a bookmark's name in the sidebar to rename it. Its menu also offers Replace Bookmark URL with Current."},
         {DPKeepWindowsActive, @"macwindow", @"Keep windows active", @"Keep a window's deep shadow, sidebar colour and window buttons after you click into another app. Experimental."},
     };
@@ -4165,7 +4197,7 @@ static NSToolbarItemIdentifier const DPSearchItemIdentifier = @"DiaPatchesSearch
         text.orientation = NSUserInterfaceLayoutOrientationVertical;
         text.alignment = NSLayoutAttributeLeading;
         text.spacing = 2;
-        NSStackView *leading = [NSStackView stackViewWithViews:@[DPIconTile(rows[i].symbol, tints[i]), text]];
+        NSStackView *leading = [NSStackView stackViewWithViews:@[DPIconTile(rows[i].symbol, tints[i % tints.count]), text]];
         leading.spacing = 10;
         leading.alignment = NSLayoutAttributeCenterY;
         NSSwitch *toggle = [NSSwitch new];
@@ -4817,6 +4849,7 @@ __attribute__((constructor)) static void DPInit(void) {
     }
 
     DPHook(NSClassFromString(@"ArcBrowserApplication"), @selector(setFeatureEnabled:enabled:), DPApp_setFeatureEnabled);
+    DPHook(NSClassFromString(@"NewTabPage.NewTabPageViewController"), @selector(viewDidLayout), DPNewTabPage_viewDidLayout);
     DPHook(NSClassFromString(@"TabUI.TabContentView"), @selector(layout), DPTabContent_layout);
     DPHook(NSClassFromString(@"TabList.TabListCollectionViewLayout"), @selector(prepareLayout), DPTabListLayout_prepare);
     DPHook(NSClassFromString(@"TabList.TabListCollectionViewLayout"), @selector(finalLayoutAttributesForDisappearingItemAtIndexPath:), DPTabListLayout_disappearing);
@@ -4873,6 +4906,7 @@ __attribute__((constructor)) static void DPInit(void) {
         DPConfigureArcBar();
         DPWatchBookmarkDoubleClicks();
         DPWatchSidebarBackgroundClicks();
+        DPWatchNewTabClicks();
         DPWatchSeparatorClicks();
         DPHook(object_getClass(NSApp), @selector(sendEvent:), DPApp_sendEvent);  // after DPArcBarInstall's ⌘T and ⌘L
         DPLittleWindows = [NSHashTable weakObjectsHashTable];
@@ -4890,7 +4924,7 @@ __attribute__((constructor)) static void DPInit(void) {
     [center addObserverForName:NSMenuDidBeginTrackingNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
         DPAddSubfolderItem(note.object);
         for (NSMenuItem *item in [note.object itemArray]) {  // Dia calls its spaces profiles
-            if (![item.title isEqualToString:@"Move to Profile"] || !item.submenu) continue;
+            if (!DPOn[DPMoveToSpace] || ![item.title isEqualToString:@"Move to Profile"] || !item.submenu) continue;
             item.title = @"Move to Space";
             DPTakeOverSpaceMoves(note.object, item.submenu);
         }
