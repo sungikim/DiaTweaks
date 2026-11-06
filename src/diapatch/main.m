@@ -410,7 +410,7 @@ static BOOL update(void) {
 
 // Deletes only what DiaPatches creates, in case DIAPATCH_HOME points somewhere shared.
 static BOOL purge(void) {
-    for (NSString *name in @[ @"bin", @DYLIB, @"pristine", @"staged", @"identity", @"diapatch.log" ])
+    for (NSString *name in @[ @"bin", @DYLIB, @"pristine", @"staged", @"identity", @"diapatch.log", @"mobile" ])
         if (!removeTree(inHome(name))) return NO;
     if (!removeTree([gCache stringByAppendingPathComponent:@"download"])) return NO;
     rmdir(gCache.fileSystemRepresentation);
@@ -426,6 +426,9 @@ static BOOL uninstall(BOOL purgeFiles) {
         if (!removeTree(copy) || !clone(gPristine, copy) || !moveBundle(copy, gApp)) return removeTree(copy), NO;
     }
     say(@"%@ is the official Dia %@", gApp, versionOf(gApp));
+    // Phone access's server goes with the patches.
+    run(@[ @"/bin/launchctl", @"bootout", [NSString stringWithFormat:@"gui/%d/com.diapatches.mobile", getuid()] ], NULL);
+    [NSFileManager.defaultManager removeItemAtPath:[NSHomeDirectory() stringByAppendingPathComponent:@"Library/LaunchAgents/com.diapatches.mobile.plist"] error:nil];
     return removeTree(gStaged) && (!purgeFiles || purge());
 }
 

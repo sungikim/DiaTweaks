@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dia">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Dia</title>
+<style>
+:root {
+  --bg: #f2f2f7; --card: #ffffff; --text: #1c1c1e; --muted: #8a8a8e; --line: rgba(60,60,67,.14);
+  --chip: rgba(118,118,128,.12); --chip-on: #1c1c1e; --chip-on-text: #ffffff; --accent: #0a84ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000; --card: #1c1c1e; --text: #f2f2f7; --muted: #8d8d93; --line: rgba(84,84,88,.45);
+    --chip: rgba(118,118,128,.24); --chip-on: #f2f2f7; --chip-on-text: #000000;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden; }
+main { position: relative; will-change: transform; }
+.peek { position: absolute; left: 0; width: 100%; }
+body {
+  font: 16px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  padding: env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 24px);
+}
+header { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 12px 16px 8px; }
+.title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.updated { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.spaces { display: flex; gap: 8px; overflow-x: auto; margin: 10px -16px 0; padding: 0 16px; scrollbar-width: none; }
+.spaces::-webkit-scrollbar { display: none; }
+.spaces button {
+  flex: none; border: 0; border-radius: 999px; padding: 7px 14px; font: 600 14px -apple-system, system-ui, sans-serif;
+  background: var(--chip); color: var(--text);
+}
+.spaces button[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-text); }
+.search {
+  width: 100%; margin-top: 10px; border: 0; border-radius: 10px; padding: 9px 12px; font-size: 16px;
+  background: var(--chip); color: var(--text); outline: none; -webkit-appearance: none;
+}
+section { margin: 18px 16px 0; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); margin: 0 4px 6px; }
+.favorites { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
+.favorites a {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; color: var(--text);
+  font-size: 11px; text-align: center; min-width: 0;
+}
+.favorites .tile { width: 56px; height: 56px; border-radius: 14px; background: var(--card); display: grid; place-items: center; }
+.favorites span.name { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list { background: var(--card); border-radius: 12px; overflow: hidden; }
+.row {
+  display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 8px 14px; text-decoration: none; color: var(--text);
+  border-top: .5px solid var(--line); width: 100%; background: none; border-left: 0; border-right: 0; border-bottom: 0;
+  font: inherit; text-align: left;
+}
+.list > .row:first-child, .list > details:first-child > summary.row { border-top: 0; }
+.row:active { background: var(--chip); }
+.row .text { flex: 1; min-width: 0; }
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .url { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details > summary { list-style: none; cursor: pointer; }
+details > summary::-webkit-details-marker { display: none; }
+.chevron { color: var(--muted); transition: transform .15s; flex: none; }
+details[open] > summary .chevron { transform: rotate(90deg); }
+.children { padding-left: 22px; }
+.icon { width: 22px; height: 22px; flex: none; border-radius: 5px; object-fit: contain; }
+.tile .icon { width: 30px; height: 30px; border-radius: 7px; }
+.letter {
+  display: grid; place-items: center; font-weight: 600; font-size: 12px; color: #fff; background: var(--accent);
+}
+.tile .letter { font-size: 16px; }
+.folder { width: 22px; height: 22px; flex: none; color: var(--muted); }
+.note { color: var(--muted); font-size: 13px; margin: 14px 20px 0; }
+.empty { color: var(--muted); text-align: center; padding: 48px 24px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title"><h1 id="space">Dia</h1><span class="updated" id="updated"></span></div>
+  <nav class="spaces" id="spaces"></nav>
+  <input class="search" id="search" type="search" placeholder="Search" autocomplete="off" autocapitalize="off" spellcheck="false">
+</header>
+<main id="main"></main>
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+let data = { spaces: [] };
+let current = store.get("space", null);
+const open = new Set(store.get("open", []));
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+
+const palette = ["#0a84ff", "#5e5ce6", "#bf5af2", "#ff375f", "#ff9f0a", "#30d158", "#64d2ff", "#ac8e68"];
+function icon(item) {
+  const letter = el("span", { class: "icon letter" }, ((item.title || item.url || "?").trim()[0] || "?").toUpperCase());
+  letter.style.background = palette[[...(item.icon || item.url || "")].reduce((a, c) => a + c.charCodeAt(0), 0) % palette.length];
+  if (!item.icon) return letter;
+  const img = el("img", { class: "icon", alt: "", loading: "lazy", src: "site/" + encodeURIComponent(item.icon) + ".png" });
+  img.addEventListener("error", () => img.replaceWith(letter));
+  return img;
+}
+
+function pretty(url) {
+  return url.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "");
+}
+
+function link(item, showURL = true) {
+  return el("a", { class: "row", href: item.url, target: "_blank", rel: "noopener noreferrer" },
+    icon(item), el("div", { class: "text" }, el("div", { class: "name" }, item.title || pretty(item.url)), showURL ? el("div", { class: "url" }, pretty(item.url)) : null));
+}
+
+const folderSVG = '<svg class="folder" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h3.6c.6 0 1.2.2 1.6.6L12 6h6.5A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg>';
+const chevronSVG = '<svg class="chevron" width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function folder(node, key) {
+  const d = el("details");
+  if (open.has(key)) d.open = true;
+  d.addEventListener("toggle", () => {
+    if (d.open) open.add(key); else open.delete(key);
+    store.set("open", [...open]);
+  });
+  const summary = el("summary", { class: "row" });
+  summary.innerHTML = folderSVG;
+  summary.append(el("div", { class: "text" }, el("div", { class: "name" }, node.title || "Folder")));
+  summary.insertAdjacentHTML("beforeend", chevronSVG);
+  d.append(summary, el("div", { class: "children" }, ...nodes(node.children || [], key)));
+  return d;
+}
+
+function nodes(list, prefix) {
+  return list.map((n, i) => n.children ? folder(n, prefix + "/" + (n.title || i)) : n.url ? link(n, false) : null);
+}
+
+function flatten(list, out = []) {
+  for (const n of list) n.children ? flatten(n.children, out) : n.url && out.push(n);
+  return out;
+}
+
+function render() {
+  const spaces = data.spaces || [];
+  const space = spaces.find((s) => s.id === current) || spaces[0];
+  $("spaces").replaceChildren(...(spaces.length > 1 ? spaces.map((s) => el("button", {
+    "aria-pressed": String(s === space),
+    onclick: () => show(s),
+  }, s.name || "Space")) : []));
+  $("spaces").querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: "center", block: "nearest" });
+  $("space").textContent = space ? space.name || "Dia" : "Dia";
+  if (space && space.updated) {
+    const mins = Math.round((Date.now() / 1000 - space.updated) / 60);
+    $("updated").textContent = mins < 1 ? "Just now" : mins < 60 ? mins + " min ago" : mins < 1440 ? Math.round(mins / 60) + " hr ago" : new Date(space.updated * 1000).toLocaleDateString();
+  } else $("updated").textContent = "";
+  const main = $("main");
+  if (!space) { main.replaceChildren(el("div", { class: "empty" }, "Nothing yet. Open Dia on your Mac with Phone access turned on.")); return; }
+
+  const q = $("search").value.trim().toLowerCase();
+  if (q) {
+    const seen = new Set(), hits = [];
+    for (const s of spaces)
+      for (const n of [...(s.favorites || []), ...flatten(s.bookmarks || []), ...(s.tabs || [])])
+        if (!seen.has(n.url) && ((n.title || "").toLowerCase().includes(q) || n.url.toLowerCase().includes(q))) { seen.add(n.url); hits.push(n); }
+    main.replaceChildren(hits.length ? el("section", {}, el("div", { class: "list" }, ...hits.map(link))) : el("div", { class: "empty" }, "No results"));
+    return;
+  }
+  main.replaceChildren(...content(space));
+}
+
+// A space's favorites, bookmarks and tabs.
+function content(space) {
+  const parts = [];
+  if (space.partial) parts.push(el("p", { class: "note" }, "Folders appear after this space has been open in a Dia window once."));
+  if ((space.favorites || []).length)
+    parts.push(el("section", {}, el("div", { class: "favorites" }, ...space.favorites.map((f) =>
+      el("a", { href: f.url, target: "_blank", rel: "noopener noreferrer" }, el("div", { class: "tile" }, icon(f)), el("span", { class: "name" }, f.title || pretty(f.url)))))));
+  if ((space.bookmarks || []).length)
+    parts.push(el("section", {}, el("h2", {}, "Bookmarks"), el("div", { class: "list" }, ...nodes(space.bookmarks, space.id))));
+  if ((space.tabs || []).length)
+    parts.push(el("section", {}, el("h2", {}, "Tabs"), el("div", { class: "list" }, ...space.tabs.map(link))));
+  return parts.length ? parts : [el("div", { class: "empty" }, "This space is empty.")];
+}
+
+function show(space) {
+  current = space.id;
+  store.set("space", current);
+  render();
+  window.scrollTo(0, 0);
+}
+
+// Swipe left or right to go to the next or previous space: the page follows the finger with the next space
+// beside it, and slides over when let go past a quarter of the width or flicked.
+let drag = null;
+function neighbor(step) {
+  const spaces = data.spaces || [];
+  const i = Math.max(0, spaces.findIndex((s) => s.id === current));
+  return spaces[i + step];
+}
+function slide(x, animate) {
+  const main = $("main");
+  main.style.transition = animate ? "transform .28s cubic-bezier(.25,.8,.25,1)" : "none";
+  main.style.transform = x ? `translate3d(${x}px,0,0)` : "";
+}
+document.addEventListener("touchstart", (e) => {
+  drag = null;
+  if (e.touches.length !== 1 || e.target.closest(".spaces, .search") || $("search").value.trim() || (data.spaces || []).length < 2) return;
+  drag = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), dx: 0, axis: null, peek: null, step: 0 };
+}, { passive: true });
+document.addEventListener("touchmove", (e) => {
+  if (!drag) return;
+  const dx = e.touches[0].clientX - drag.x, dy = e.touches[0].clientY - drag.y;
+  if (!drag.axis) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    drag.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+  }
+  if (drag.axis !== "x") return;
+  e.preventDefault();  // no vertical scrolling while paging
+  const step = dx < 0 ? 1 : -1, next = neighbor(step);
+  if (step !== drag.step) {  // show the space on the side being uncovered
+    drag.peek?.remove();
+    drag.step = step;
+    drag.peek = null;
+    if (next) {
+      const main = $("main"), header = document.querySelector("header");
+      drag.peek = el("div", { class: "peek" }, ...content(next));
+      drag.peek.style.top = Math.max(0, window.scrollY + header.offsetHeight - main.offsetTop) + "px";
+      drag.peek.style.transform = `translateX(${step * 100}%)`;
+      main.append(drag.peek);
+    }
+  }
+  drag.dx = next ? dx : dx / 3;  // resist past the first and last space
+  slide(drag.dx, false);
+}, { passive: false });
+document.addEventListener("touchend", () => {
+  if (!drag || drag.axis !== "x") { drag = null; return; }
+  const d = drag, width = window.innerWidth, next = neighbor(d.step);
+  drag = null;
+  const fast = Math.abs(d.dx) / Math.max(1, Date.now() - d.t) > 0.5;
+  if (next && (Math.abs(d.dx) > width / 4 || fast)) {
+    slide(-d.step * width, true);
+    $("main").addEventListener("transitionend", () => { slide(0, false); show(next); }, { once: true });
+  } else {
+    slide(0, true);
+    $("main").addEventListener("transitionend", () => d.peek?.remove(), { once: true });
+  }
+});
+document.addEventListener("touchcancel", () => { if (drag) { drag.peek?.remove(); drag = null; slide(0, true); } });
+
+async function load() {
+  try {
+    const r = await fetch("sidebar.json", { cache: "no-store" });
+    if (r.ok) { data = await r.json(); store.set("data", data); }
+  } catch (e) {}
+  render();
+}
+
+data = store.get("data", data);  // show the last copy at once, even offline
+render();
+load();
+$("search").addEventListener("input", render);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+</script>
+</body>
+</html>
