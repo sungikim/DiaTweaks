@@ -28,6 +28,7 @@ This fork of [JaceThings/DiaTweaks](https://github.com/JaceThings/DiaTweaks) add
 - **Tab memory.** Each tab's row in the sidebar shows the memory it uses, in MB, the figure Activity Monitor shows for its processes. Tabs sharing a process each count all of it. Experimental: it keeps a DevTools setting on that Dia turns off.
 - **Move folders to any space.** A folder with subfolders can also go to the spaces Dia greys out for it. The folder is made again there, so its tabs reload and may be logged out.
 - **New Tab opens the command bar.** New Tab in the sidebar opens the bar ⌘T does instead of Dia's new tab page.
+- **Peek on Shift-Click.** Shift-click a link to preview it in a card over the page. Ported from JaceThings/DiaTweaks.
 - **Plain new tab page.** Dia's new tab page keeps only its address box, without AI suggestions, upsells or the template gallery.
 - **Little window for links.** Like Little Arc, a link opened from another app opens in a small window without the sidebar. **Open in Window** (⌘O) moves the page to a tab in your main window.
 - **Keep windows active.** A window keeps its active look after you click into another app.

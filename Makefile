@@ -5,8 +5,8 @@ all: build/diapatch build/DiaPatches.dylib build/diapatch-mobile
 build/diapatch: src/diapatch/main.m | build
 	clang $(CFLAGS) -framework Foundation -o $@ $<
 
-build/DiaPatches.dylib: src/dylib/DiaPatches.m src/dylib/ArcBar.m src/dylib/ArcBar.h src/dylib/Tabs.m src/dylib/Tabs.h | build
-	clang $(CFLAGS) -dynamiclib -framework AppKit -framework QuartzCore -lsqlite3 -o $@ $(filter %.m,$^)
+build/DiaPatches.dylib: src/dylib/DiaPatches.m src/dylib/ArcBar.m src/dylib/ArcBar.h src/dylib/Tabs.m src/dylib/Tabs.h $(wildcard src/dylib/Peek/*) | build
+	clang $(CFLAGS) -dynamiclib -framework AppKit -framework QuartzCore -framework Carbon -lsqlite3 -o $@ $(filter %.m,$^)
 
 build/index_html.h: src/mobile/index.html | build
 	cd src/mobile && xxd -i index.html > ../../$@

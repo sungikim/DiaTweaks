@@ -1,4 +1,5 @@
 #import "ArcBar.h"
+#import "Peek/PeekTweak.h"
 #import "Tabs.h"
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
@@ -19,11 +20,11 @@
 typedef NS_ENUM(NSInteger, DPTweak) {
     DPEdgeToEdge, DPHideToolbar, DPSquareSidebarCorners, DPAnimatedCount,
     DPHideChatButton = DPAnimatedCount, DPHideSidebarButton, DPHideChatsButton, DPHideRecentTabsButton, DPNestedFolders,
-    DPExtensionsButton, DPHideTabGlow, DPSidebarURLBar, DPCommandBar, DPFolderDropdowns, DPKeepWindowsActive, DPTidyTabs, DPDownloadsAtBottom, DPLittleWindow, DPTabMemory, DPMoveToSpace, DPNewTabBar, DPPlainNewTab, DPArcBookmarks, DPPhoneAccess, DPTweakCount
+    DPExtensionsButton, DPHideTabGlow, DPSidebarURLBar, DPCommandBar, DPFolderDropdowns, DPKeepWindowsActive, DPTidyTabs, DPDownloadsAtBottom, DPLittleWindow, DPTabMemory, DPMoveToSpace, DPNewTabBar, DPPlainNewTab, DPPeekOnShiftClick, DPArcBookmarks, DPPhoneAccess, DPTweakCount
 };
 
-static NSString *const DPKeys[DPTweakCount] = {@"edgeToEdge", @"hideToolbar", @"squareSidebarCorners", @"hideChatButton", @"hideSidebarButton", @"hideChatsButton", @"hideRecentTabsButton", @"nestedFolders", @"extensionsButton", @"hideTabGlow", @"sidebarURLBar", @"commandBar", @"folderDropdowns", @"keepWindowsActive", @"tidyTabs", @"downloadsAtBottom", @"littleWindow", @"tabMemory", @"moveToSpace", @"newTabBar", @"plainNewTab", @"arcBookmarks", @"phoneAccess"};
-static const BOOL DPDefaultsOn[DPTweakCount] = {YES, NO, YES, NO, NO, NO, NO, NO, YES, YES, YES, YES, YES, NO, YES, YES, YES, YES, YES, YES, YES, YES, NO};
+static NSString *const DPKeys[DPTweakCount] = {@"edgeToEdge", @"hideToolbar", @"squareSidebarCorners", @"hideChatButton", @"hideSidebarButton", @"hideChatsButton", @"hideRecentTabsButton", @"nestedFolders", @"extensionsButton", @"hideTabGlow", @"sidebarURLBar", @"commandBar", @"folderDropdowns", @"keepWindowsActive", @"tidyTabs", @"downloadsAtBottom", @"littleWindow", @"tabMemory", @"moveToSpace", @"newTabBar", @"plainNewTab", @"peek", @"arcBookmarks", @"phoneAccess"};
+static const BOOL DPDefaultsOn[DPTweakCount] = {YES, NO, YES, NO, NO, NO, NO, NO, YES, YES, YES, YES, YES, NO, YES, YES, YES, YES, YES, YES, YES, YES, YES, NO};
 static const CGFloat DPWindowPadding = 6;
 static const CFTimeInterval DPAnimationDuration = 0.25;
 
@@ -2331,7 +2332,8 @@ static void DPSetTweak(DPTweak tweak, BOOL on) {
     else if (tweak == DPTidyTabs) DPRefreshSeparators();
     else if (tweak == DPPhoneAccess) DPApplyPhoneAccess();
     else if (tweak == DPTabMemory) DPApplyTabMemory();
-    else if (tweak != DPNestedFolders && tweak != DPSidebarURLBar && tweak != DPCommandBar && tweak != DPFolderDropdowns && tweak != DPArcBookmarks && tweak != DPDownloadsAtBottom && tweak != DPLittleWindow && tweak != DPTabMemory && tweak != DPMoveToSpace && tweak != DPNewTabBar && tweak != DPPlainNewTab) {
+    else if (tweak == DPPeekOnShiftClick) DPPeekSetOn(on);
+    else if (tweak != DPNestedFolders && tweak != DPSidebarURLBar && tweak != DPCommandBar && tweak != DPFolderDropdowns && tweak != DPArcBookmarks && tweak != DPDownloadsAtBottom && tweak != DPLittleWindow && tweak != DPTabMemory && tweak != DPMoveToSpace && tweak != DPNewTabBar && tweak != DPPlainNewTab && tweak != DPPeekOnShiftClick) {
         if (on) for (NSView *bar in DPBars.allObjects) DPEnforceButtons(bar);
         else DPRestoreButtons(tweak);
         DPRelayoutBars();
@@ -2607,7 +2609,7 @@ static void DPApp_sendEvent(NSApplication *self, SEL _cmd, NSEvent *event) {
         && DPCloseLittleWindow(event.window ?: self.keyWindow))  // ⌘W closes a little window, not just its tab
         return;
     if (event.type == NSEventTypeKeyDown && !event.isARepeat && event.keyCode == 13 && modifiers == NSEventModifierFlagCommand
-        && DPReplaceLastTab(event.window ?: self.keyWindow))
+        && !DPPeekShowingIn(event.window ?: self.keyWindow) && DPReplaceLastTab(event.window ?: self.keyWindow))
         return;
     if (event.type == NSEventTypeKeyDown && !event.isARepeat && event.keyCode == 31 && modifiers == NSEventModifierFlagCommand
         && DPMoveLittleWindow(event.window ?: self.keyWindow))  // ⌘O in a little window
@@ -4179,6 +4181,7 @@ static NSToolbarItemIdentifier const DPSearchItemIdentifier = @"DiaPatchesSearch
         {DPMoveToSpace, @"folder", @"Move folders to any space", @"A folder's Move to Space can also pick the spaces Dia greys out for a folder with subfolders. The folder is made again there, so its tabs reload and may be logged out."},
         {DPNewTabBar, @"plus.magnifyingglass", @"New Tab opens the command bar", @"New Tab in the sidebar opens the bar ⌘T does, with suggestions as you type, instead of Dia's new tab page. Needs Command bar."},
         {DPPlainNewTab, @"rectangle", @"Plain new tab page", @"Dia's new tab page keeps only its address box: no AI suggestions, upsells or template gallery. New tab pages opened after turning it off are back to normal."},
+        {DPPeekOnShiftClick, @"eye", @"Peek on Shift-Click", @"Shift-click a link to preview it in a card over the page, like Arc. Click outside, press Escape or ⌘W to close it, ⌘O to open it as a tab, or use the buttons beside it."},
         {DPArcBookmarks, @"bookmark", @"Arc-style bookmarks", @"Double-click a bookmark's name in the sidebar to rename it. Its menu also offers Replace Bookmark URL with Current."},
         {DPKeepWindowsActive, @"macwindow", @"Keep windows active", @"Keep a window's deep shadow, sidebar colour and window buttons after you click into another app. Experimental."},
     };
@@ -4849,6 +4852,8 @@ __attribute__((constructor)) static void DPInit(void) {
     }
 
     DPHook(NSClassFromString(@"ArcBrowserApplication"), @selector(setFeatureEnabled:enabled:), DPApp_setFeatureEnabled);
+    DPPeekSetOn(DPOn[DPPeekOnShiftClick]);
+    DPPeekInstall();
     DPHook(NSClassFromString(@"NewTabPage.NewTabPageViewController"), @selector(viewDidLayout), DPNewTabPage_viewDidLayout);
     DPHook(NSClassFromString(@"TabUI.TabContentView"), @selector(layout), DPTabContent_layout);
     DPHook(NSClassFromString(@"TabList.TabListCollectionViewLayout"), @selector(prepareLayout), DPTabListLayout_prepare);
